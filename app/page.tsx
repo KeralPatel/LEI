@@ -69,6 +69,7 @@ export default function Home() {
     } catch (error) {
       setResult({
         success: false,
+        message: 'Connection failed',
         error: 'Failed to connect to API. Make sure the backend server is running.'
       })
     } finally {

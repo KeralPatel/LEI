@@ -1,1 +1,1 @@
-self.__RSC_SERVER_MANIFEST="{\n  \"node\": {},\n  \"edge\": {},\n  \"encryptionKey\": \"9IU8E4QmibDHYu+A5IMiWu+GK36L1F8YDuJjFmnMDWI=\"\n}"
+self.__RSC_SERVER_MANIFEST="{\"node\":{},\"edge\":{},\"encryptionKey\":\"L7x4RMVaLogOSWDorsSDa+6TsehTjSdqUQOFzts5xIA=\"}"
