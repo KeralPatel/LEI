@@ -126,6 +126,72 @@ export class TokenService {
       throw error
     }
   }
+
+  async distributeTokensBulk(recipients: Array<{name: string, email: string, id: string, wallet: string, hrsWorked: number}>) {
+    const results = []
+    
+    console.log(`Starting bulk distribution to ${recipients.length} recipients`)
+    
+    for (let i = 0; i < recipients.length; i++) {
+      const recipient = recipients[i]
+      const tokensToDistribute = Math.floor(recipient.hrsWorked)
+      
+      try {
+        console.log(`Processing recipient ${i + 1}/${recipients.length}: ${recipient.name}`)
+        
+        const transactionResult = await this.distributeTokens(recipient.wallet, tokensToDistribute, {
+          name: recipient.name,
+          email: recipient.email,
+          id: recipient.id,
+          hrsWorked: recipient.hrsWorked
+        })
+        
+        results.push({
+          success: true,
+          recipient: {
+            name: recipient.name,
+            email: recipient.email,
+            id: recipient.id,
+            wallet: recipient.wallet
+          },
+          distribution: {
+            hoursWorked: recipient.hrsWorked,
+            tokensDistributed: tokensToDistribute,
+            rate: '1 token per hour'
+          },
+          transaction: transactionResult
+        })
+        
+        console.log(`Successfully distributed ${tokensToDistribute} tokens to ${recipient.name}`)
+        
+      } catch (error: any) {
+        console.error(`Failed to distribute tokens to ${recipient.name}:`, error)
+        
+        results.push({
+          success: false,
+          recipient: {
+            name: recipient.name,
+            email: recipient.email,
+            id: recipient.id,
+            wallet: recipient.wallet
+          },
+          distribution: {
+            hoursWorked: recipient.hrsWorked,
+            tokensDistributed: 0,
+            rate: '1 token per hour'
+          },
+          error: error.message
+        })
+      }
+    }
+    
+    const successfulCount = results.filter(r => r.success).length
+    const failedCount = results.filter(r => !r.success).length
+    
+    console.log(`Bulk distribution completed: ${successfulCount} successful, ${failedCount} failed`)
+    
+    return results
+  }
 }
 
 // Create a singleton instance
@@ -141,4 +207,9 @@ export function getTokenService(): TokenService {
 export async function distributeTokens(recipientAddress: string, amount: number, metadata: any = {}) {
   const tokenService = getTokenService()
   return await tokenService.distributeTokens(recipientAddress, amount, metadata)
+}
+
+export async function distributeTokensBulk(recipients: Array<{name: string, email: string, id: string, wallet: string, hrsWorked: number}>) {
+  const tokenService = getTokenService()
+  return await tokenService.distributeTokensBulk(recipients)
 }
