@@ -410,9 +410,28 @@ export default function Home() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-300">Wallet Address</span>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (user?.custodialWallet.address) {
-                          navigator.clipboard.writeText(user.custodialWallet.address);
+                          if (navigator.clipboard && navigator.clipboard.writeText) {
+                            try {
+                              await navigator.clipboard.writeText(user.custodialWallet.address);
+                            } catch (err) {
+                              console.error("Failed to copy to clipboard:", err);
+                              const textArea = document.createElement("textarea");
+                              textArea.value = user.custodialWallet.address;
+                              document.body.appendChild(textArea);
+                              textArea.select();
+                              document.execCommand("copy");
+                              document.body.removeChild(textArea);
+                            }
+                          } else {
+                            const textArea = document.createElement("textarea");
+                            textArea.value = user.custodialWallet.address;
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand("copy");
+                            document.body.removeChild(textArea);
+                          }
                           setShowCopyToast(true);
                           setTimeout(() => setShowCopyToast(false), 2000);
                         }
