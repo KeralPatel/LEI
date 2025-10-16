@@ -1,4 +1,11 @@
 {
+  "/_not-found": "app/_not-found.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/health/route": "app/api/health/route.js",
+  "/api/auth/register/route": "app/api/auth/register/route.js",
   "/page": "app/page.js",
-  "/api/distribute-tokens/route": "app/api/distribute-tokens/route.js"
+  "/api/distribute-tokens/route": "app/api/distribute-tokens/route.js",
+  "/api/wallet/balance/route": "app/api/wallet/balance/route.js",
+  "/api/wallet/withdraw/route": "app/api/wallet/withdraw/route.js",
+  "/api/wallet/native-balance/route": "app/api/wallet/native-balance/route.js"
 }

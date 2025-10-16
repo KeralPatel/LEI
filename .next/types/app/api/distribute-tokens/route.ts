@@ -1,4 +1,4 @@
-// File: D:\Work\KnightVault\token-distribution-backend\app\api\distribute-tokens\route.ts
+// File: D:\Work\KnightVault\token-distribution-backend\frontend\app\api\distribute-tokens\route.ts
 import * as entry from '../../../../../app/api/distribute-tokens/route.js'
 import type { NextRequest } from 'next/server.js'
 

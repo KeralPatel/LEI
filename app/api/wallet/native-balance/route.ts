@@ -5,19 +5,23 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001'
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const body = await request.json()
+    const authHeader = request.headers.get('authorization')
+    
+    if (!authHeader) {
+      return NextResponse.json({
+        success: false,
+        error: 'Authorization header required'
+      }, { status: 401 })
+    }
     
     // Forward the request to the backend API
-    const response = await fetch(`${BACKEND_URL}/api/distribute-tokens`, {
-      method: 'POST',
+    const response = await fetch(`${BACKEND_URL}/api/wallet/native-balance`, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        // Add authentication header if needed
-        'Authorization': request.headers.get('authorization') || '',
+        'Authorization': authHeader,
       },
-      body: JSON.stringify(body)
     })
 
     const data = await response.json()
@@ -25,7 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data, { status: response.status })
 
   } catch (error: any) {
-    console.error('Token distribution error:', error)
+    console.error('Native balance fetch error:', error)
     return NextResponse.json({
       success: false,
       error: 'Failed to connect to backend server',
