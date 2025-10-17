@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Send, Wallet, Clock, CheckCircle, AlertCircle, ExternalLink, Plus, Trash2, Users, LogIn, LogOut, User, Shield, XCircle } from 'lucide-react'
+import { Send, Wallet, Clock, CheckCircle, AlertCircle, ExternalLink, Plus, Trash2, Users, LogIn, LogOut, User, Shield, XCircle, Key, Copy, Eye, EyeOff } from 'lucide-react'
 import { loginUser, registerUser, logoutUser, getAuthToken, getAuthHeaders, getCurrentUser, User as UserType } from '@/lib/auth'
 import { getTokenBalance, getNativeBalance } from '@/lib/wallet'
+import { createApiKey, getApiKeys, deleteApiKey, storeApiKey, getStoredApiKey, removeStoredApiKey, ApiKey } from '@/lib/apiKeys'
 
 interface Recipient {
   name: string
@@ -102,6 +103,21 @@ export default function Home() {
   const [tokenBalance, setTokenBalance] = useState<string>('0')
   const [nativeBalance, setNativeBalance] = useState<string>('0')
   const [walletLoading, setWalletLoading] = useState(false)
+  
+  // API Key state
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false)
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
+  const [apiKeyLoading, setApiKeyLoading] = useState(false)
+  const [newApiKey, setNewApiKey] = useState<ApiKey | null>(null)
+  const [showApiKeySecret, setShowApiKeySecret] = useState(false)
+  const [apiKeyForm, setApiKeyForm] = useState({
+    name: '',
+    permissions: {
+      read: true,
+      write: true,
+      admin: true
+    }
+  })
 
   // Check authentication on component mount
   useEffect(() => {
@@ -117,6 +133,7 @@ export default function Home() {
   useEffect(() => {
     if (isAuthenticated) {
       loadWalletBalances()
+      loadApiKeys()
     }
   }, [isAuthenticated])
 
@@ -315,6 +332,62 @@ export default function Home() {
     setResult(null)
   }
 
+  // API Key management functions
+  const loadApiKeys = async () => {
+    setApiKeyLoading(true)
+    try {
+      const response = await getApiKeys()
+      if (response.success && response.data) {
+        setApiKeys(response.data.apiKeys)
+      }
+    } catch (error) {
+      console.error('Failed to load API keys:', error)
+    } finally {
+      setApiKeyLoading(false)
+    }
+  }
+
+  const handleCreateApiKey = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setApiKeyLoading(true)
+    
+    try {
+      const response = await createApiKey(apiKeyForm)
+      if (response.success && response.data) {
+        setNewApiKey(response.data.apiKey)
+        setApiKeyForm({ name: '', permissions: { read: true, write: true, admin: false } })
+        loadApiKeys() // Refresh the list
+      } else {
+        alert(response.error || 'Failed to create API key')
+      }
+    } catch (error) {
+      alert('Failed to create API key')
+    } finally {
+      setApiKeyLoading(false)
+    }
+  }
+
+  const handleDeleteApiKey = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this API key?')) return
+    
+    try {
+      const response = await deleteApiKey(id)
+      if (response.success) {
+        loadApiKeys() // Refresh the list
+      } else {
+        alert(response.error || 'Failed to delete API key')
+      }
+    } catch (error) {
+      alert('Failed to delete API key')
+    }
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setShowCopyToast(true)
+    setTimeout(() => setShowCopyToast(false), 2000)
+  }
+
   return (
     <div className="min-h-screen bg-gray-900">
       <div className="container mx-auto px-4 py-8">
@@ -503,6 +576,84 @@ export default function Home() {
                     <p>• <strong>Refresh:</strong> Click the refresh button to update your balance</p>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* API Key Management */}
+          {isAuthenticated && (
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-purple-600 p-2 rounded-xl">
+                    <Key className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">API Key Management</h3>
+                    <p className="text-gray-300 text-sm">Create and manage API keys for programmatic access</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowApiKeyModal(true)}
+                  className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create API Key
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {apiKeyLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                    <span className="ml-3 text-white">Loading API keys...</span>
+                  </div>
+                ) : apiKeys.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Key className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-300">No API keys created yet</p>
+                    <p className="text-gray-400 text-sm">Create your first API key to get started</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {apiKeys.map((apiKey) => (
+                      <div key={apiKey.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <h4 className="text-white font-semibold">{apiKey.name}</h4>
+                              <span className={`px-2 py-1 rounded-full text-xs ${
+                                apiKey.isActive 
+                                  ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                                  : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                              }`}>
+                                {apiKey.isActive ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-300 mb-2">
+                              <span className="font-mono">{apiKey.keyPrefix}</span>
+                            </div>
+                            <div className="flex items-center space-x-4 text-xs text-gray-400">
+                              <span>Created: {new Date(apiKey.createdAt).toLocaleDateString()}</span>
+                              {apiKey.lastUsed && (
+                                <span>Last used: {new Date(apiKey.lastUsed).toLocaleDateString()}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleDeleteApiKey(apiKey.id)}
+                              className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors"
+                              title="Delete API key"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1165,6 +1316,126 @@ export default function Home() {
                     )}
                   </button>
                 </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* API Key Creation Modal */}
+        {showApiKeyModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-2xl p-8 w-full max-w-md mx-4">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-3xl font-bold text-white">Create API Key</h2>
+                <button
+                  onClick={() => setShowApiKeyModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/10"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateApiKey} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    API Key Name
+                  </label>
+                  <input
+                    type="text"
+                    value={apiKeyForm.name}
+                    onChange={(e) => setApiKeyForm(prev => ({ ...prev, name: e.target.value }))}
+                    required
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-200"
+                    placeholder="My API Key"
+                  />
+                </div>
+
+
+                <div className="flex space-x-4">
+                  <button
+                    type="submit"
+                    disabled={apiKeyLoading}
+                    className="flex-1 bg-purple-600 text-white py-4 px-6 rounded-xl hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {apiKeyLoading ? 'Creating...' : 'Create API Key'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* New API Key Display Modal */}
+        {newApiKey && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-2xl p-8 w-full max-w-lg mx-4">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-3xl font-bold text-white">API Key Created</h2>
+                <button
+                  onClick={() => setNewApiKey(null)}
+                  className="text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/10"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-4">
+                  <div className="flex items-center mb-2">
+                    <AlertCircle className="h-5 w-5 text-yellow-400 mr-2" />
+                    <span className="text-yellow-200 font-semibold">Important</span>
+                  </div>
+                  <p className="text-yellow-100 text-sm">
+                    This is the only time you'll see the full API key. Make sure to copy and store it securely.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Your API Key
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showApiKeySecret ? 'text' : 'password'}
+                      value={newApiKey.key || ''}
+                      readOnly
+                      className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white font-mono text-sm pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKeySecret(!showApiKeySecret)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                    >
+                      {showApiKeySecret ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => {
+                      if (newApiKey.key) {
+                        copyToClipboard(newApiKey.key)
+                      }
+                    }}
+                    className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center"
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy API Key
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (newApiKey.key) {
+                        storeApiKey(newApiKey.key)
+                        setNewApiKey(null)
+                        setShowApiKeyModal(false)
+                      }
+                    }}
+                    className="flex-1 bg-green-600 text-white py-3 px-6 rounded-xl hover:bg-green-700 transition-colors"
+                  >
+                    Store & Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
