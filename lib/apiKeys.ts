@@ -1,6 +1,7 @@
 // API Key management utilities
 
 export interface ApiKey {
+  key: string
   id: string
   name: string
   keyPrefix: string
