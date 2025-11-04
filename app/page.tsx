@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Send, Wallet, Clock, CheckCircle, AlertCircle, ExternalLink, Plus, Trash2, Users, LogIn, LogOut, User, Shield, XCircle, Key, Copy, Eye, EyeOff } from 'lucide-react'
+import { Send, Wallet, Clock, CheckCircle, AlertCircle, ExternalLink, Plus, Trash2, Users, LogIn, LogOut, User, Shield, XCircle, Key, Copy, Eye, EyeOff, Upload } from 'lucide-react'
 import { loginUser, registerUser, logoutUser, getAuthToken, getAuthHeaders, getCurrentUser, User as UserType } from '@/lib/auth'
 import { getTokenBalance, getNativeBalance } from '@/lib/wallet'
 import { createApiKey, getApiKeys, deleteApiKey, storeApiKey, getStoredApiKey, removeStoredApiKey, ApiKey } from '@/lib/apiKeys'
@@ -181,6 +181,109 @@ export default function Home() {
     if (recipients.length > 1) {
       setRecipients(prev => prev.filter((_, i) => i !== index))
     }
+  }
+
+  const handleCsvImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const csvText = e.target?.result as string
+        const lines = csvText.split('\n').filter(line => line.trim())
+        
+        if (lines.length < 2) {
+          alert('CSV file must contain at least a header row and one data row')
+          return
+        }
+
+        const importedRecipients: Recipient[] = []
+        let skippedRows = 0
+        
+        // Skip header row and process data rows
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim()
+          if (!line) continue // Skip empty lines
+          
+          // More robust CSV parsing that handles quoted fields
+          const columns: string[] = []
+          let currentColumn = ''
+          let inQuotes = false
+          
+          for (let j = 0; j < line.length; j++) {
+            const char = line[j]
+            if (char === '"') {
+              inQuotes = !inQuotes
+            } else if (char === ',' && !inQuotes) {
+              columns.push(currentColumn.trim())
+              currentColumn = ''
+            } else {
+              currentColumn += char
+            }
+          }
+          columns.push(currentColumn.trim()) // Add the last column
+          
+          // Remove quotes from column values
+          const cleanColumns = columns.map(col => col.replace(/^"(.*)"$/, '$1').trim())
+          
+          // Check if we have at least 7 columns (B=1, G=6)
+          if (cleanColumns.length < 7) {
+            console.warn(`Row ${i + 1} has insufficient columns (${cleanColumns.length}), skipping`)
+            skippedRows++
+            continue
+          }
+
+          const name = cleanColumns[1] || '' // Column B
+          const hrsWorked = cleanColumns[6] || '' // Column G
+          
+          // Skip rows with empty name or hours
+          if (!name || !hrsWorked) {
+            console.warn(`Row ${i + 1} has empty name or hours, skipping`)
+            skippedRows++
+            continue
+          }
+
+          // Validate hours is a number
+          const hoursNum = parseFloat(hrsWorked)
+          if (isNaN(hoursNum) || hoursNum < 0) {
+            console.warn(`Row ${i + 1} has invalid hours value: ${hrsWorked}, skipping`)
+            skippedRows++
+            continue
+          }
+
+          importedRecipients.push({
+            name: name,
+            email: '', // Can be empty
+            id: '', // Can be empty
+            wallet: '', // Can be empty
+            hrsWorked: hrsWorked
+          })
+        }
+
+        if (importedRecipients.length === 0) {
+          alert('No valid data found in CSV file. Please ensure column B contains names and column G contains valid hours.')
+          return
+        }
+
+        // Replace current recipients with imported data
+        setRecipients(importedRecipients)
+        
+        let message = `Successfully imported ${importedRecipients.length} recipients from CSV file`
+        if (skippedRows > 0) {
+          message += ` (${skippedRows} rows skipped due to missing or invalid data)`
+        }
+        alert(message)
+        
+      } catch (error) {
+        console.error('Error parsing CSV:', error)
+        alert('Error parsing CSV file. Please ensure it\'s a valid CSV format.')
+      }
+    }
+    
+    reader.readAsText(file)
+    // Reset the input so the same file can be selected again
+    event.target.value = ''
   }
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
@@ -897,14 +1000,31 @@ export default function Home() {
                       </table>
                     </div>
                     
-                    <button
-                      type="button"
-                      onClick={addRecipient}
-                      className="w-full py-4 px-6 border-2 border-dashed border-white/30 rounded-xl text-gray-300 hover:border-blue-500 hover:text-blue-300 transition-all duration-200 flex items-center justify-center bg-white/5 hover:bg-white/10 backdrop-blur-sm"
-                    >
-                      <Plus className="h-5 w-5 mr-2" />
-                      Add Another Recipient
-                    </button>
+                    <div className="flex space-x-4">
+                      <button
+                        type="button"
+                        onClick={addRecipient}
+                        className="flex-1 py-4 px-6 border-2 border-dashed border-white/30 rounded-xl text-gray-300 hover:border-blue-500 hover:text-blue-300 transition-all duration-200 flex items-center justify-center bg-white/5 hover:bg-white/10 backdrop-blur-sm"
+                      >
+                        <Plus className="h-5 w-5 mr-2" />
+                        Add Another Recipient
+                      </button>
+                      
+                      <label className="flex-1 py-4 px-6 border-2 border-dashed border-green-500/50 rounded-xl text-green-300 hover:border-green-400 hover:text-green-200 transition-all duration-200 flex items-center justify-center bg-green-500/10 hover:bg-green-500/20 backdrop-blur-sm cursor-pointer">
+                        <Upload className="h-5 w-5 mr-2" />
+                        Import from CSV
+                        <input
+                          type="file"
+                          accept=".csv"
+                          onChange={handleCsvImport}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                    
+                    <div className="text-xs text-gray-400 mt-2 text-center">
+                      CSV format: Column B = Name, Column G = Hours (email, ID, wallet can be empty)
+                    </div>
                   </div>
                 </>
               )}
