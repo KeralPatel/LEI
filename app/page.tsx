@@ -227,8 +227,8 @@ export default function Home() {
           // Remove quotes from column values
           const cleanColumns = columns.map(col => col.replace(/^"(.*)"$/, '$1').trim())
           
-          // Check if we have at least 7 columns (B=1, G=6)
-          if (cleanColumns.length < 7) {
+          // Check if we have at least 10 columns (B=1, G=6, J=9)
+          if (cleanColumns.length < 10) {
             console.warn(`Row ${i + 1} has insufficient columns (${cleanColumns.length}), skipping`)
             skippedRows++
             continue
@@ -236,6 +236,7 @@ export default function Home() {
 
           const name = cleanColumns[1] || '' // Column B
           const hrsWorked = cleanColumns[6] || '' // Column G
+          const wallet = cleanColumns[9] || '' // Column J
           
           // Skip rows with empty name or hours
           if (!name || !hrsWorked) {
@@ -256,13 +257,13 @@ export default function Home() {
             name: name,
             email: '', // Can be empty
             id: '', // Can be empty
-            wallet: '', // Can be empty
+            wallet: wallet, // Column J
             hrsWorked: hrsWorked
           })
         }
 
         if (importedRecipients.length === 0) {
-          alert('No valid data found in CSV file. Please ensure column B contains names and column G contains valid hours.')
+          alert('No valid data found in CSV file. Please ensure column B contains names, column G contains valid hours, and column J contains wallet addresses.')
           return
         }
 
@@ -1023,7 +1024,7 @@ export default function Home() {
                     </div>
                     
                     <div className="text-xs text-gray-400 mt-2 text-center">
-                      CSV format: Column B = Name, Column G = Hours (email, ID, wallet can be empty)
+                      CSV format: Column B = Name, Column G = Hours, Column J = Wallet Address (email, ID can be empty)
                     </div>
                   </div>
                 </>
