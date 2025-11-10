@@ -378,15 +378,18 @@ export default function Home() {
       
       if (distributionMode === 'single') {
         requestBody = {
-          ...formData,
+          name: formData.name,
+          email: '', // Not required in UI
+          id: '', // Not required in UI
+          walletAddress: formData.walletAddress,
           hrsWorked: parseFloat(formData.hrsWorked)
         }
       } else {
         // Validate all recipients
         const validRecipients = recipients.map(recipient => ({
           name: recipient.name,
-          email: recipient.email,
-          id: recipient.id,
+          email: '', // Not required in UI
+          id: '', // Not required in UI
           wallet: recipient.wallet,
           hrsWorked: parseFloat(recipient.hrsWorked)
         }))
@@ -834,36 +837,6 @@ export default function Home() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-200"
-                      placeholder="john@example.com"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Employee ID *
-                    </label>
-                    <input
-                      type="text"
-                      name="id"
-                      value={formData.id}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-200"
-                      placeholder="EMP001"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       Wallet Address *
                     </label>
                     <input
@@ -899,7 +872,7 @@ export default function Home() {
                   {/* Multiple Recipients Form - Table Style */}
                   <div className="space-y-4">
                     <div className="overflow-x-auto">
-                      <table className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-2xl" style={{ minWidth: '1200px' }}>
+                      <table className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-2xl" style={{ minWidth: '800px' }}>
                         <thead className="bg-white/10">
                           <tr>
                             <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-12">
@@ -907,12 +880,6 @@ export default function Home() {
                             </th>
                             <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
                               Name *
-                            </th>
-                            <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">
-                              Email *
-                            </th>
-                            <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
-                              ID *
                             </th>
                             <th className="px-4 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
                               Hours *
@@ -939,26 +906,6 @@ export default function Home() {
                                   required
                                   className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-200 text-sm"
                                   placeholder="John Doe"
-                                />
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap">
-                                <input
-                                  type="email"
-                                  value={recipient.email}
-                                  onChange={(e) => handleRecipientChange(index, 'email', e.target.value)}
-                                  required
-                                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-200 text-sm"
-                                  placeholder="john@example.com"
-                                />
-                              </td>
-                              <td className="px-4 py-4 whitespace-nowrap">
-                                <input
-                                  type="text"
-                                  value={recipient.id}
-                                  onChange={(e) => handleRecipientChange(index, 'id', e.target.value)}
-                                  required
-                                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-200 text-sm"
-                                  placeholder="EMP001"
                                 />
                               </td>
                               <td className="px-4 py-4 whitespace-nowrap">
@@ -1024,7 +971,7 @@ export default function Home() {
                     </div>
                     
                     <div className="text-xs text-gray-400 mt-2 text-center">
-                      CSV format: Column B = Name, Column G = Hours, Column J = Wallet Address (email, ID can be empty)
+                      CSV format: Column B = Name, Column G = Hours, Column J = Wallet Address
                     </div>
                   </div>
                 </>
