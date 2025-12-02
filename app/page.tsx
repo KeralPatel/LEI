@@ -78,6 +78,13 @@ export default function Home() {
   ])
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<DistributionResult | null>(null)
+  const [progress, setProgress] = useState<{
+    current: number
+    total: number
+    currentRecipient?: string
+    status?: string
+    results?: Array<any>
+  } | null>(null)
   
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -372,11 +379,13 @@ export default function Home() {
 
     setIsLoading(true)
     setResult(null)
+    setProgress(null)
 
     try {
       let requestBody
       
       if (distributionMode === 'single') {
+        // For single recipient, use regular endpoint
         requestBody = {
           name: formData.name,
           email: '', // Not required in UI
@@ -384,8 +393,26 @@ export default function Home() {
           walletAddress: formData.walletAddress,
           hrsWorked: parseFloat(formData.hrsWorked)
         }
+
+        const authHeaders = getAuthHeaders()
+        const response = await fetch('/api/distribute-tokens', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authHeaders.Authorization && { Authorization: authHeaders.Authorization }),
+          },
+          body: JSON.stringify(requestBody)
+        })
+
+        const data = await response.json()
+        setResult(data)
+        
+        // Reload wallet balances after distribution
+        if (data.success) {
+          loadWalletBalances()
+        }
       } else {
-        // Validate all recipients
+        // For bulk recipients, use streaming endpoint
         const validRecipients = recipients.map(recipient => ({
           name: recipient.name,
           email: '', // Not required in UI
@@ -397,33 +424,108 @@ export default function Home() {
         requestBody = {
           recipients: validRecipients
         }
-      }
 
-      const authHeaders = getAuthHeaders()
-      const response = await fetch('/api/distribute-tokens', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authHeaders.Authorization && { Authorization: authHeaders.Authorization }),
-        },
-        body: JSON.stringify(requestBody)
-      })
+        const authHeaders = getAuthHeaders()
+        const response = await fetch('/api/distribute-tokens-stream', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authHeaders.Authorization && { Authorization: authHeaders.Authorization }),
+          },
+          body: JSON.stringify(requestBody)
+        })
 
-      const data = await response.json()
-      setResult(data)
-      
-      // Reload wallet balances after distribution
-      if (data.success) {
-        loadWalletBalances()
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({
+            error: 'Unknown error occurred',
+            status: response.status
+          }))
+          setResult({
+            success: false,
+            error: errorData.error || 'Failed to start distribution',
+            message: errorData.message
+          })
+          setIsLoading(false)
+          return
+        }
+
+        // Handle streaming response
+        const reader = response.body?.getReader()
+        const decoder = new TextDecoder()
+        const results: any[] = []
+
+        if (!reader) {
+          throw new Error('No response body')
+        }
+
+        while (true) {
+          const { done, value } = await reader.read()
+          
+          if (done) {
+            break
+          }
+
+          const chunk = decoder.decode(value, { stream: true })
+          const lines = chunk.split('\n')
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6))
+                
+                if (data.type === 'start') {
+                  setProgress({
+                    current: 0,
+                    total: data.total,
+                    results: []
+                  })
+                } else if (data.type === 'progress') {
+                  setProgress(prev => ({
+                    ...prev!,
+                    current: data.current,
+                    total: data.total,
+                    currentRecipient: data.recipient,
+                    status: data.status
+                  }))
+                } else if (data.type === 'result') {
+                  results.push(data.result)
+                  setProgress(prev => ({
+                    ...prev!,
+                    current: data.current,
+                    total: data.total,
+                    results: [...results]
+                  }))
+                } else if (data.type === 'complete') {
+                  setResult({
+                    success: true,
+                    message: data.message,
+                    data: data.data
+                  })
+                  // Reload wallet balances after distribution
+                  loadWalletBalances()
+                } else if (data.type === 'error') {
+                  setResult({
+                    success: false,
+                    error: data.error,
+                    message: data.details
+                  })
+                }
+              } catch (error) {
+                console.error('Error parsing SSE data:', error)
+              }
+            }
+          }
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       setResult({
         success: false,
         message: 'Connection failed',
-        error: 'Failed to connect to API. Make sure the backend server is running.'
+        error: error.message || 'Failed to connect to API. Make sure the backend server is running.'
       })
     } finally {
       setIsLoading(false)
+      setProgress(null)
     }
   }
 
@@ -437,6 +539,7 @@ export default function Home() {
     })
     setRecipients([{ name: '', email: '', id: '', wallet: '', hrsWorked: '' }])
     setResult(null)
+    setProgress(null)
   }
 
   // API Key management functions
@@ -1006,6 +1109,115 @@ export default function Home() {
               </div>
             </form>
           </div>
+
+          {/* Progress Section */}
+          {progress && (
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-2xl p-8">
+              <div className="flex items-center mb-6">
+                <div className="bg-blue-600 p-3 rounded-xl">
+                  <Clock className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <h2 className="text-3xl font-bold text-white">Distribution Progress</h2>
+                  <p className="text-gray-300 mt-1">Processing distributions in real-time</p>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-white font-medium">
+                    {progress.current - 1} of {progress.total} completed
+                  </span>
+                  <span className="text-gray-300 text-sm">
+                    {Math.round(((progress.current - 1) / progress.total) * 100)}%
+                  </span>
+                </div>
+                <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-blue-600 h-full transition-all duration-300 ease-out"
+                    style={{ width: `${((progress.current - 1) / progress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Current Status */}
+              {progress.currentRecipient && (
+                <div className="bg-blue-500/20 border border-blue-500/30 rounded-xl p-4 mb-6">
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                    <div>
+                      <span className="text-white font-medium">Processing: </span>
+                      <span className="text-blue-200">{progress.currentRecipient}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Individual Results */}
+              {progress.results && progress.results.length > 0 && (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  <h3 className="text-white font-semibold mb-3">Completed Distributions</h3>
+                  {progress.results.map((individualResult: any, index: number) => (
+                    <div
+                      key={index}
+                      className={`rounded-xl p-4 border ${
+                        individualResult.success
+                          ? 'bg-green-500/20 border-green-500/30'
+                          : 'bg-red-500/20 border-red-500/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          {individualResult.success ? (
+                            <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
+                          ) : (
+                            <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+                          )}
+                          <span className="text-white font-medium">
+                            {individualResult.recipient.name}
+                          </span>
+                        </div>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            individualResult.success
+                              ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                              : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                          }`}
+                        >
+                          {individualResult.success ? 'Success' : 'Failed'}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-sm text-gray-300 space-y-1">
+                        <div>
+                          <span className="font-medium">Tokens: </span>
+                          {individualResult.distribution.tokensDistributed}
+                        </div>
+                        {individualResult.transaction && (
+                          <div>
+                            <a
+                              href={individualResult.transaction.explorerUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center text-blue-400 hover:text-blue-300 text-xs"
+                            >
+                              <ExternalLink className="h-3 w-3 mr-1" />
+                              View Transaction
+                            </a>
+                          </div>
+                        )}
+                        {individualResult.error && (
+                          <div className="text-red-300 text-xs mt-1">
+                            Error: {individualResult.error}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Results Section */}
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-2xl p-8">
