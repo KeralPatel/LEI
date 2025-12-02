@@ -501,6 +501,8 @@ export default function Home() {
                     message: data.message,
                     data: data.data
                   })
+                  // Clear progress to show final results
+                  setProgress(null)
                   // Reload wallet balances after distribution
                   loadWalletBalances()
                 } else if (data.type === 'error') {
@@ -1110,8 +1112,8 @@ export default function Home() {
             </form>
           </div>
 
-          {/* Progress Section */}
-          {progress && (
+          {/* Progress Section - Only show when actively processing */}
+          {progress && isLoading && (
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-2xl p-8">
               <div className="flex items-center mb-6">
                 <div className="bg-blue-600 p-3 rounded-xl">
@@ -1322,75 +1324,104 @@ export default function Home() {
                 {result.data?.totalRecipients && (
                   <>
                     {/* Summary */}
-                    <div className="bg-blue-50 rounded-lg p-4">
-                      <h3 className="font-semibold text-gray-900 mb-2">Distribution Summary</h3>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-600">{result.data.totalRecipients}</div>
-                          <div className="text-gray-600">Total Recipients</div>
+                    <div className="bg-blue-500/20 border border-blue-500/30 rounded-2xl p-6">
+                      <h3 className="font-bold text-white mb-4 text-lg">Distribution Summary</h3>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="text-center bg-white/5 rounded-xl p-4 border border-white/10">
+                          <div className="text-3xl font-bold text-blue-400 mb-1">{result.data.totalRecipients}</div>
+                          <div className="text-gray-300 text-sm">Total Recipients</div>
                         </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-green-600">{result.data.successfulDistributions}</div>
-                          <div className="text-gray-600">Successful</div>
+                        <div className="text-center bg-white/5 rounded-xl p-4 border border-white/10">
+                          <div className="text-3xl font-bold text-green-400 mb-1">{result.data.successfulDistributions}</div>
+                          <div className="text-gray-300 text-sm">Successful</div>
                         </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-red-600">{result.data.failedDistributions}</div>
-                          <div className="text-gray-600">Failed</div>
+                        <div className="text-center bg-white/5 rounded-xl p-4 border border-white/10">
+                          <div className="text-3xl font-bold text-red-400 mb-1">{result.data.failedDistributions}</div>
+                          <div className="text-gray-300 text-sm">Failed</div>
                         </div>
                       </div>
                     </div>
 
                     {/* Individual Results */}
                     <div className="space-y-3">
-                      <h3 className="font-semibold text-white">Individual Results</h3>
-                      {result.data.results?.map((individualResult, index) => (
-                        <div key={index} className={`rounded-lg p-4 ${
-                          individualResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-                        }`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center">
-                              {individualResult.success ? (
-                                <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
-                              ) : (
-                                <AlertCircle className="h-4 w-4 text-red-600 mr-2" />
-                              )}
-                              <span className="font-medium text-gray-900">{individualResult.recipient.name}</span>
+                      <h3 className="font-bold text-white text-lg mb-4">Individual Results</h3>
+                      <div className="max-h-96 overflow-y-auto space-y-3">
+                        {result.data.results?.map((individualResult: any, index: number) => (
+                          <div
+                            key={index}
+                            className={`rounded-xl p-4 border ${
+                              individualResult.success
+                                ? 'bg-green-500/20 border-green-500/30'
+                                : 'bg-red-500/20 border-red-500/30'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center">
+                                {individualResult.success ? (
+                                  <CheckCircle className="h-5 w-5 text-green-400 mr-2" />
+                                ) : (
+                                  <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+                                )}
+                                <span className="text-white font-medium">{individualResult.recipient.name}</span>
+                              </div>
+                              <span
+                                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                  individualResult.success
+                                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                                    : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                }`}
+                              >
+                                {individualResult.success ? 'Success' : 'Failed'}
+                              </span>
                             </div>
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                              individualResult.success 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                            }`}>
-                              {individualResult.success ? 'Success' : 'Failed'}
-                            </span>
-                          </div>
-                          
-                          <div className="text-sm text-gray-600 space-y-1">
-                            <div><span className="font-medium">Email:</span> {individualResult.recipient.email}</div>
-                            <div><span className="font-medium">ID:</span> {individualResult.recipient.id}</div>
-                            <div><span className="font-medium">Hours:</span> {individualResult.distribution.hoursWorked}</div>
-                            <div><span className="font-medium">Tokens:</span> {individualResult.distribution.tokensDistributed}</div>
-                            {individualResult.transaction && (
-                              <div className="pt-2">
-                                <a
-                                  href={individualResult.transaction.explorerUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs"
-                                >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  View Transaction
-                                </a>
+                            
+                            <div className="text-sm text-gray-300 space-y-1">
+                              {individualResult.recipient.email && (
+                                <div>
+                                  <span className="font-medium">Email: </span>
+                                  {individualResult.recipient.email}
+                                </div>
+                              )}
+                              {individualResult.recipient.id && (
+                                <div>
+                                  <span className="font-medium">ID: </span>
+                                  {individualResult.recipient.id}
+                                </div>
+                              )}
+                              <div>
+                                <span className="font-medium">Wallet: </span>
+                                <span className="font-mono text-xs">{individualResult.recipient.wallet}</span>
                               </div>
-                            )}
-                            {individualResult.error && (
-                              <div className="text-red-600 text-xs mt-1">
-                                Error: {individualResult.error}
+                              <div>
+                                <span className="font-medium">Hours: </span>
+                                {individualResult.distribution.hoursWorked}
                               </div>
-                            )}
+                              <div>
+                                <span className="font-medium">Tokens: </span>
+                                {individualResult.distribution.tokensDistributed}
+                              </div>
+                              {individualResult.transaction && (
+                                <div className="pt-2">
+                                  <a
+                                    href={individualResult.transaction.explorerUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center text-blue-400 hover:text-blue-300 text-xs"
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    View Transaction
+                                  </a>
+                                </div>
+                              )}
+                              {individualResult.error && (
+                                <div className="text-red-300 text-xs mt-1">
+                                  Error: {individualResult.error}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </>
                 )}
